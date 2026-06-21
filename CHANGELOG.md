@@ -2,7 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.1.1] - 2026-06-21
+
+First public release. (`0.1.0` was burned by a partial Clojars deploy whose pom
+omitted a license; it is not a usable release — use `0.1.1`.)
 
 ### Added
 - Initial project scaffolding (deps.edn, tools.build, test runner).
