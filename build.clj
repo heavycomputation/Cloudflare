@@ -4,13 +4,13 @@
   Usage:
     clojure -T:build jar      ; build a jar into target/
     clojure -T:build install  ; install into the local Maven repo
-    clojure -T:build deploy    ; deploy to Clojars (needs CLOJARS_* env vars)
+    clojure -T:build deploy   ; deploy to Clojars (needs CLOJARS_* env vars)
     clojure -T:build clean"
   (:require [clojure.tools.build.api :as b]
             [deps-deploy.deps-deploy :as dd]))
 
 (def lib 'com.heavycomputation/cloudflare)
-(def version (format "0.1.%s" (b/git-count-revs nil)))
+(def version "0.1.0")
 (def class-dir "target/classes")
 (def basis (delay (b/create-basis {:project "deps.edn"})))
 (def jar-file (format "target/%s-%s.jar" (name lib) version))

@@ -1,13 +1,10 @@
 {:paths ["src" "resources"]
 
+ ;; Zero runtime dependencies beyond Clojure itself: R2 is reached by signing
+ ;; requests with AWS Signature V4 (com.heavycomputation.cloudflare.internal.*)
+ ;; and sending them over the JDK's built-in java.net.http client.
  :deps
- {org.clojure/clojure        {:mvn/version "1.12.0"}
-
-  ;; R2 is S3-compatible — Cognitect's data-driven aws-api client talks to it
-  ;; directly via a custom endpoint. See com.heavycomputation.cloudflare.r2.
-  com.cognitect.aws/api      {:mvn/version "0.8.692"}
-  com.cognitect.aws/endpoints {:mvn/version "1.1.12.772"}
-  com.cognitect.aws/s3       {:mvn/version "871.2.30.22"}}
+ {org.clojure/clojure {:mvn/version "1.12.0"}}
 
  :aliases
  {;; Run the test suite:  clojure -X:test
@@ -17,6 +14,16 @@
                  {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
    :main-opts   ["-m" "cognitect.test-runner"]
    :exec-fn     cognitect.test-runner.api/test}
+
+  ;; Live R2 round-trip against a real bucket (needs CLOUDFLARE_* env vars):
+  ;;   clojure -X:integration
+  ;; Kept separate from :test so CI stays offline.
+  :integration
+  {:extra-paths ["test-integration"]
+   :extra-deps  {io.github.cognitect-labs/test-runner
+                 {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+   :exec-fn     cognitect.test-runner.api/test
+   :exec-args   {:dirs ["test-integration"]}}
 
   ;; Build / install / deploy the jar:  clojure -T:build jar
   :build
