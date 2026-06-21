@@ -26,7 +26,12 @@
                 :basis     @basis
                 :src-dirs  ["src"]
                 :scm       {:url "https://github.com/heavycomputation/cloudflare"
-                            :tag (str "v" version)}})
+                            :tag (str "v" version)}
+                ;; Clojars requires the pom to declare a license.
+                :pom-data  [[:licenses
+                             [:license
+                              [:name "MIT License"]
+                              [:url "https://opensource.org/licenses/MIT"]]]]})
   (b/copy-dir {:src-dirs   ["src" "resources"]
                :target-dir class-dir})
   (b/jar {:class-dir class-dir
