@@ -1,0 +1,29 @@
+{:paths ["src" "resources"]
+
+ :deps
+ {org.clojure/clojure        {:mvn/version "1.12.0"}
+
+  ;; R2 is S3-compatible — Cognitect's data-driven aws-api client talks to it
+  ;; directly via a custom endpoint. See com.heavycomputation.cloudflare.r2.
+  com.cognitect.aws/api      {:mvn/version "0.8.692"}
+  com.cognitect.aws/endpoints {:mvn/version "1.1.12.772"}
+  com.cognitect.aws/s3       {:mvn/version "871.2.30.22"}}
+
+ :aliases
+ {;; Run the test suite:  clojure -X:test
+  :test
+  {:extra-paths ["test"]
+   :extra-deps  {io.github.cognitect-labs/test-runner
+                 {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+   :main-opts   ["-m" "cognitect.test-runner"]
+   :exec-fn     cognitect.test-runner.api/test}
+
+  ;; Build / install / deploy the jar:  clojure -T:build jar
+  :build
+  {:deps       {io.github.clojure/tools.build {:mvn/version "0.10.5"}
+                slipset/deps-deploy           {:mvn/version "0.2.2"}}
+   :ns-default build}
+
+  ;; REPL for development:  clojure -M:dev
+  :dev
+  {:extra-paths ["test" "dev"]}}}
