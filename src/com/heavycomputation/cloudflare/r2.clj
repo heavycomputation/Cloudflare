@@ -11,6 +11,7 @@
     (delete bucket key)       ; remove; also delete-many for batches
     (list bucket opts)        ; enumerate by prefix; also list-seq (lazy)
     (presigned-url bucket k)  ; time-limited download/upload URL
+    (create-multipart-upload bucket k) ; broker a browser-direct multipart upload
     (request bucket req)      ; escape hatch to the raw signed-S3 surface
 
   `put` hides the single-PUT vs. multipart decision: small objects go up in one
@@ -554,6 +555,11 @@
 
 (def ^:private max-expires-seconds (* 7 24 60 60)) ; SigV4 caps presign at 7 days
 
+(defn- check-expires [expires]
+  (when-not (<= 1 expires max-expires-seconds)
+    (throw (ex-info "presigned :expires must be between 1 and 604800 seconds (7 days)"
+                    {:expires expires}))))
+
 (defn presigned-url
   "Build a presigned URL for `key` that grants temporary, credential-free access
   — anyone with the URL can use it until it expires. Options:
@@ -561,12 +567,89 @@
     :expires  validity window in seconds (default 900 = 15 min; max 7 days)
 
   For `:put`, a client `PUT`s the file straight to the returned URL, so large
-  uploads never pass through your server. Returns the URL string."
+  uploads never pass through your server. A single PUT is capped at 5 GiB — for
+  larger objects use the multipart flow (`create-multipart-upload` →
+  `presigned-upload-part` → `complete-multipart-upload`). Returns the URL string."
   [{:keys [client bucket]} key & [{:keys [method expires]
                                    :or   {method :get expires 900}}]]
-  (when-not (<= 1 expires max-expires-seconds)
-    (throw (ex-info "presigned-url :expires must be between 1 and 604800 seconds (7 days)"
-                    {:expires expires})))
+  (check-expires expires)
   (s3/presign client {:method  (-> method name str/upper-case)
                       :path    (object-path bucket key)
                       :expires expires}))
+
+;; ---------------------------------------------------------------------------
+;; Browser-direct multipart uploads
+;;
+;; For a large object the browser uploads straight to R2 without the bytes ever
+;; passing through your server. Your server only brokers the multipart lifecycle
+;; — it initiates the upload, presigns a PUT URL per part for the browser, then
+;; completes (or aborts) from the part ETags the browser collected. The three
+;; lifecycle calls are signed server-side; only `presigned-upload-part` produces
+;; a credential-free URL. The flow is stateless: persist the `:upload-id` (e.g.
+;; in your DB) and pass it back with `key` on each subsequent request.
+;;
+;;   (def up (r2/create-multipart-upload bucket "archives/pack.zip"))
+;;   ;; for each part the browser holds, hand it a URL to PUT to:
+;;   (r2/presigned-upload-part bucket "archives/pack.zip" (:upload-id up) 1
+;;                             {:expires 21600})
+;;   ;; browser PUTs each part, reads the ETag from the response, reports back:
+;;   (r2/complete-multipart-upload bucket "archives/pack.zip" (:upload-id up)
+;;                                 [{:part-number 1 :etag "\"…\""} …])
+;;   ;; or, if the user cancels:
+;;   (r2/abort-multipart-upload bucket "archives/pack.zip" (:upload-id up))
+;; ---------------------------------------------------------------------------
+
+(defn create-multipart-upload
+  "Initiate a multipart upload of `key`, returning
+  `{:key key :bucket bucket :upload-id id}`. Pass the `:upload-id` (with `key`)
+  to `presigned-upload-part`, `complete-multipart-upload`, and
+  `abort-multipart-upload`.
+
+  Options (set on the object, same as `put`): `:content-type` (else inferred
+  from the key's extension), `:metadata`, `:cache-control`."
+  [{:keys [client bucket]} key & [opts]]
+  {:key       key
+   :bucket    bucket
+   :upload-id (create-multipart client bucket key (object-headers key opts))})
+
+(defn presigned-upload-part
+  "Presigned PUT URL the browser uses to upload part `part-number` (1-based) of
+  the multipart upload `upload-id` directly to R2. Each part must be at least
+  5 MiB except the last. Options:
+    :expires  validity window in seconds (default 900 = 15 min; max 7 days)
+
+  The URL covers one part; presign each part the browser holds. Pick `:expires`
+  to span the *whole* upload, not one part — a slow uplink may take hours, and an
+  expired signature 403s mid-transfer. Returns the URL string."
+  [{:keys [client bucket]} key upload-id part-number & [{:keys [expires]
+                                                         :or   {expires 900}}]]
+  (check-expires expires)
+  (s3/presign client {:method  "PUT"
+                      :path    (object-path bucket key)
+                      :query   {"partNumber" (str part-number) "uploadId" upload-id}
+                      :expires expires}))
+
+(defn complete-multipart-upload
+  "Finalise multipart upload `upload-id`, assembling the object from its parts.
+  `parts` is `[{:part-number n :etag \"…\"} …]` — the ETag each part PUT
+  returned, quotes included; order doesn't matter (sorted here). Returns
+  `{:key key :bucket bucket :etag etag}`. Throws `ex-info` if R2 reports any
+  part missing or mismatched."
+  [{:keys [client bucket]} key upload-id parts]
+  (let [ordered (->> parts
+                     (sort-by :part-number)
+                     (mapv (fn [{:keys [part-number etag]}]
+                             {:PartNumber part-number :ETag etag})))]
+    {:key    key
+     :bucket bucket
+     :etag   (complete-multipart client bucket key upload-id ordered)}))
+
+(defn abort-multipart-upload
+  "Discard the in-progress multipart upload `upload-id` and any parts already
+  uploaded, so no orphaned parts keep billing — call this when the user cancels.
+  Idempotent: succeeds whether or not the upload still exists. Returns `true`."
+  [{:keys [client bucket]} key upload-id]
+  (let [resp (abort-multipart client bucket key upload-id)]
+    (when (and (>= (:status resp) 400) (not= 404 (:status resp)))
+      (throw (s3-error :AbortMultipartUpload resp)))
+    true))

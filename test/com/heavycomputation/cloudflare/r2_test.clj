@@ -383,3 +383,76 @@
     (testing "expiry bounds are validated"
       (is (thrown? clojure.lang.ExceptionInfo (r2/presigned-url bkt "k" {:expires 0})))
       (is (thrown? clojure.lang.ExceptionInfo (r2/presigned-url bkt "k" {:expires 999999}))))))
+
+;; --- browser-direct multipart uploads --------------------------------------
+
+(deftest create-multipart-upload-returns-handle
+  (let [[calls stub] (recording-client)]
+    (with-redefs [s3/send-request stub]
+      (let [up (r2/create-multipart-upload handle "archives/pack.zip"
+                                           {:metadata {:owner "heavy"}})]
+        (is (= {:key "archives/pack.zip" :bucket "uploads" :upload-id "upload-1"} up))
+        (let [req (first @calls)]
+          (is (= :CreateMultipartUpload (req->op req)))
+          (is (= "POST" (:method req)))
+          (is (= "/uploads/archives/pack.zip" (:path req)))
+          (testing "content-type inferred and metadata set on the create request"
+            (is (= "application/zip" (get-in req [:headers "Content-Type"])))
+            (is (= "heavy" (get-in req [:headers "x-amz-meta-owner"])))))))))
+
+(deftest presigned-upload-part-signs-a-put-url-for-the-part
+  (let [bkt (r2/bucket {:account-id "acct" :access-key-id "AK"
+                        :secret-access-key "SK" :bucket "uploads"})
+        url (r2/presigned-upload-part bkt "pack.zip" "UP123" 2 {:expires 21600})]
+    (is (str/starts-with? url "https://acct.r2.cloudflarestorage.com/uploads/pack.zip?"))
+    (is (str/includes? url "partNumber=2"))
+    (is (str/includes? url "uploadId=UP123"))
+    (is (str/includes? url "X-Amz-Expires=21600"))
+    (is (str/includes? url "X-Amz-Signature="))
+    (testing "expiry bounds are validated"
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (r2/presigned-upload-part bkt "k" "U" 1 {:expires 0})))
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (r2/presigned-upload-part bkt "k" "U" 1 {:expires 999999}))))))
+
+(deftest complete-multipart-upload-sorts-parts-and-returns-etag
+  (let [[calls stub] (recording-client)]
+    (with-redefs [s3/send-request stub]
+      (let [res (r2/complete-multipart-upload
+                 handle "pack.zip" "UP123"
+                 ;; supplied out of order; ETags as the browser reported them
+                 [{:part-number 2 :etag "\"etag-2\""}
+                  {:part-number 1 :etag "\"etag-1\""}])]
+        (is (= {:key "pack.zip" :bucket "uploads" :etag "\"multipart-etag\""} res))
+        (let [req (first @calls)]
+          (is (= :CompleteMultipartUpload (req->op req)))
+          (is (= "UP123" (get-in req [:query "uploadId"])))
+          (testing "body lists parts sorted by number with their etags"
+            (is (= (str "<CompleteMultipartUpload>"
+                        "<Part><PartNumber>1</PartNumber><ETag>\"etag-1\"</ETag></Part>"
+                        "<Part><PartNumber>2</PartNumber><ETag>\"etag-2\"</ETag></Part>"
+                        "</CompleteMultipartUpload>")
+                   (String. ^bytes (:body req) StandardCharsets/UTF_8)))))))))
+
+(deftest abort-multipart-upload-is-idempotent-but-surfaces-real-errors
+  (testing "a normal abort sends DELETE with the uploadId and returns true"
+    (let [[calls stub] (recording-client)]
+      (with-redefs [s3/send-request stub]
+        (is (true? (r2/abort-multipart-upload handle "pack.zip" "UP123")))
+        (let [req (first @calls)]
+          (is (= :AbortMultipartUpload (req->op req)))
+          (is (= "/uploads/pack.zip" (:path req)))
+          (is (= "UP123" (get-in req [:query "uploadId"])))))))
+  (testing "a 404 (upload already gone) is treated as success"
+    (let [responder (fn [_] {:status 404 :headers {} :body (byte-array 0)})
+          [_ stub] (recording-client responder)]
+      (with-redefs [s3/send-request stub]
+        (is (true? (r2/abort-multipart-upload handle "pack.zip" "UP123"))))))
+  (testing "a real error status throws"
+    (let [responder (fn [_] {:status 403 :headers {}
+                             :body (xml-body "<Error><Code>AccessDenied</Code></Error>")})
+          [_ stub] (recording-client responder)]
+      (with-redefs [s3/send-request stub]
+        (let [ex (is (thrown? clojure.lang.ExceptionInfo
+                              (r2/abort-multipart-upload handle "pack.zip" "UP123")))]
+          (is (= 403 (:status (ex-data ex)))))))))

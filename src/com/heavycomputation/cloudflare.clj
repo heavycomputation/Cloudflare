@@ -36,4 +36,8 @@
 (import-var 'list          #'r2/list)
 (import-var 'list-seq      #'r2/list-seq)
 (import-var 'presigned-url #'r2/presigned-url)
+(import-var 'create-multipart-upload   #'r2/create-multipart-upload)
+(import-var 'presigned-upload-part     #'r2/presigned-upload-part)
+(import-var 'complete-multipart-upload #'r2/complete-multipart-upload)
+(import-var 'abort-multipart-upload    #'r2/abort-multipart-upload)
 (import-var 'request       #'r2/request)

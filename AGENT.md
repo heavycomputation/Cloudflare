@@ -37,6 +37,8 @@ Verify changes with `clojure -X:test`.
 - [x] R2: `get` / `get-bytes` / `get-stream`
 - [x] R2: `delete` / `delete-many`, `list` / `list-seq`, `head` / `exists?`
 - [x] R2: `presigned-url` (download + upload)
+- [x] R2: browser-direct multipart (`create-multipart-upload`,
+  `presigned-upload-part`, `complete-multipart-upload`, `abort-multipart-upload`)
 - [ ] **R2 feature-complete for 0.1.0** — publish
 - [ ] Images: upload, variants, delivery URLs
 
