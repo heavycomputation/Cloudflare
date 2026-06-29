@@ -39,12 +39,18 @@ Verify changes with `clojure -X:test`.
 - [x] R2: `presigned-url` (download + upload)
 - [x] R2: browser-direct multipart (`create-multipart-upload`,
   `presigned-upload-part`, `complete-multipart-upload`, `abort-multipart-upload`)
-- [ ] **R2 feature-complete for 0.1.0** — publish
+- [x] **R2 feature-complete — published** to Clojars as
+  `com.heavycomputation/cloudflare` (latest `0.1.2`)
 - [ ] Images: upload, variants, delivery URLs
 
 ---
 
 ## Feature 1 — R2 `put` with automatic multipart
+
+> **Shipped (zero-dependency).** This was the original design spec; the notes
+> below have been reconciled to the implementation. There is no AWS SDK: every
+> request is signed with SigV4 (`internal.sigv4`) and sent over the JDK's
+> `java.net.http` client (`internal.s3`). The only runtime dependency is Clojure.
 
 ### Goal
 
@@ -77,21 +83,22 @@ part retries on its own instead of the whole file.
 
 1. **Client/bucket construction** (needed first):
    - `bucket` takes `{:account-id :access-key-id :secret-access-key :bucket
-     :region?}` and returns a handle holding an aws-api S3 client + bucket name.
+     :region?}` and returns a handle holding a signed-HTTP S3 client
+     (`internal.s3`) + bucket name.
    - R2 endpoint: `https://<account-id>.r2.cloudflarestorage.com`. Region is
-     `auto` for R2. Configure the aws-api client with this endpoint override and
-     static credentials.
+     `auto` for R2. The client signs each request with SigV4 against this
+     endpoint using the static credentials — no SDK, no endpoint resolver.
 
 2. **`(put bucket key body & [opts])`**:
    - `body` accepts at least: `java.io.File`, `InputStream`, and `byte[]`.
    - Infer `Content-Type` from the key's extension (e.g. `.zip` →
      `application/zip`), overridable via `opts`.
    - **Small objects** (below `:multipart-threshold`, default ~100 MB):
-     a single `:PutObject`.
+     a single `PutObject` (signed `PUT`).
    - **Large objects** (at/above threshold, or unknown-length streams):
-     multipart — `:CreateMultipartUpload` → upload parts (default part size
-     ~100 MB) → `:CompleteMultipartUpload`. On any failure, call
-     `:AbortMultipartUpload` so no orphaned parts are billed.
+     multipart — `CreateMultipartUpload` → upload parts (default part size
+     ~100 MB) → `CompleteMultipartUpload`. On any failure, call
+     `AbortMultipartUpload` so no orphaned parts are billed.
    - Upload parts **concurrently** with bounded parallelism
      (`:concurrency`, default ~4) and **retry** individual parts on transient
      failure.
@@ -101,19 +108,21 @@ part retries on its own instead of the whole file.
    `:content-type`, `:multipart-threshold`, `:part-size`, `:concurrency`,
    `:metadata` (custom `x-amz-meta-*`), `:cache-control`.
 
-4. **Errors:** aws-api returns errors as data (`:cognitect.anomalies/category`),
-   it does not throw. Detect anomalies, abort any in-flight multipart upload, and
-   surface a clear error (throw `ex-info` with the anomaly, or return it —
-   pick one and be consistent).
+4. **Errors:** the signed-HTTP transport returns every completed exchange as
+   data — including 4xx/5xx — rather than throwing. `put` inspects the status and
+   on a non-2xx raises an `ex-info` carrying the parsed S3 `Code`/`Message`
+   (transient 5xx/429 and network errors are retried with backoff first). Any
+   in-flight multipart upload is aborted before the error propagates.
 
 ### Notes / gotchas
 
 - A `File` has a known length (cheap multipart decision); a generic
   `InputStream` does not — buffer per-part and stream until exhausted.
-- aws-api `:s3` op keys are `:PutObject`, `:CreateMultipartUpload`,
-  `:UploadPart`, `:CompleteMultipartUpload`, `:AbortMultipartUpload`.
-- Each `:UploadPart` response `:ETag` must be collected with its part number and
-  passed (sorted) to `:CompleteMultipartUpload`.
+- The multipart lifecycle maps to the S3 operations `CreateMultipartUpload`,
+  `UploadPart`, `CompleteMultipartUpload`, and `AbortMultipartUpload`, each
+  issued as a SigV4-signed HTTP request (no SDK op layer).
+- Each `UploadPart` response's `ETag` must be collected with its part number and
+  passed (sorted) to `CompleteMultipartUpload`.
 - Part numbers are 1-based; minimum part size is 5 MiB (last part exempt).
 
 ### Done when
