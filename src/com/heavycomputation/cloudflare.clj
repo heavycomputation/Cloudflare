@@ -5,11 +5,15 @@
   in every webapp. Features are added incrementally:
 
     - R2     object storage  (S3-compatible)   -> com.heavycomputation.cloudflare.r2
-    - Images delivery/upload                    -> com.heavycomputation.cloudflare.images
+    - Images upload/manage/serve                -> com.heavycomputation.cloudflare.images
 
-  This namespace is the public entry point and re-exports the high-level API as
-  features land. For the full surface (and the raw signed-HTTP escape hatch),
-  use the per-product namespaces directly.
+  This namespace re-exports R2's high-level API for convenience. Images is *not*
+  flattened in here: its CRUD verbs (`get`/`list`/`update`/`delete`/`exists?`/
+  `get-bytes`/`request` …) would collide with R2's, and a bare `upload`/`delete`
+  at the top level couldn't tell which product you meant. So Images is used
+  through its own namespace — `(require '[…cloudflare.images :as images])` — and
+  so is R2's raw escape hatch. For the full surface, use the per-product
+  namespaces directly.
 
   `get`/`list` shadow `clojure.core` names and are excluded here; refer to them
   qualified (e.g. `cloudflare/get`)."

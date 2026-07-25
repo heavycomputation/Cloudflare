@@ -1,0 +1,3 @@
+All API's must have simple example usage in docstring
+
+R2 feature may need support for browser->R2 upload (multi-part pre-signed urls?)
