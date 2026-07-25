@@ -34,6 +34,9 @@
                               [:url "https://opensource.org/licenses/MIT"]]]]})
   (b/copy-dir {:src-dirs   ["src" "resources"]
                :target-dir class-dir})
+  ;; MIT requires the license text to travel with the software, so ship it in
+  ;; the jar rather than relying on the pom's license declaration alone.
+  (b/copy-file {:src "LICENSE" :target (str class-dir "/META-INF/LICENSE")})
   (b/jar {:class-dir class-dir
           :jar-file  jar-file})
   (println "Built" jar-file))

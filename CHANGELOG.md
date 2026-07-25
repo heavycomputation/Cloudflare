@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2] - 2026-06-29
+
+### Added
+- R2: browser-direct multipart uploads — `create-multipart-upload`,
+  `presigned-upload-part`, `complete-multipart-upload`, and
+  `abort-multipart-upload` are now public. A server can broker the multipart
+  lifecycle and hand the browser one presigned PUT URL per part, so the bytes
+  of a large object never pass through it.
+
 ## [0.1.1] - 2026-06-21
 
 First public release. (`0.1.0` was burned by a partial Clojars deploy whose pom

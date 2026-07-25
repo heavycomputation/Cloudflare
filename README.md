@@ -68,7 +68,7 @@ Early and incremental. Features land one at a time:
 deps.edn:
 
 ```clojure
-com.heavycomputation/cloudflare {:mvn/version "RELEASE"}
+com.heavycomputation/cloudflare {:mvn/version "0.1.2"}
 ```
 
 ## Development
