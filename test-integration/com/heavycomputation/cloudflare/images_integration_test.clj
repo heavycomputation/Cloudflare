@@ -3,8 +3,7 @@
 
   Run with:
 
-    clojure -M:integration -m cognitect.test-runner -d test-integration
-      -n com.heavycomputation.cloudflare.images-integration-test
+    clojure -M:integration -m cognitect.test-runner -d test-integration -n com.heavycomputation.cloudflare.images-integration-test
 
   Needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. For the managed agent
   environment, CLOUDFLARE_AGENT_API_TOKEN is accepted as a fallback. The image
