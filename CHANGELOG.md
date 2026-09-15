@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Cloudflare Images client with local uploads (`File`, `byte[]`, or
+  `InputStream`), remote URL ingestion, and browser-direct one-time upload URLs.
+- Image management through `get`, `list`/`list-seq`, `update`, `delete`, and
+  `exists?`, plus original-image downloads, account statistics, signing keys,
+  and a raw REST API escape hatch.
+- Named and flexible delivery URLs, including HMAC-signed URLs for private
+  images.
+- Zero-dependency Cloudflare REST v4 transport and JSON codec.
+- Live Images upload/get/delete integration coverage.
+
 ## [0.1.2] - 2026-06-29
 
 ### Added

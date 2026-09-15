@@ -6,9 +6,10 @@ A batteries-included Clojure library by [Heavy Computation](https://heavycomputa
 that makes working with Cloudflare products painless — so you stop copy-pasting
 the same R2 and Images glue into every new webapp.
 
-**Zero dependencies** beyond Clojure itself: R2 is reached by signing requests
-with AWS Signature V4 and sending them over the JDK's built-in HTTP client, so
-adding this library pulls in a ~13 KB jar rather than a transitive AWS SDK.
+**Zero dependencies** beyond Clojure itself: R2 requests are signed with AWS
+Signature V4, while Images uses Cloudflare's bearer-authenticated REST API.
+Both transports use the JDK's built-in HTTP client, so adding this library does
+not pull in an AWS or Cloudflare SDK.
 
 ## Status
 
@@ -16,7 +17,8 @@ Early and incremental. Features land one at a time:
 
 - [x] **R2** — object storage (S3-compatible). Upload, download, delete, list,
   and presigned URLs are all in. See below.
-- [ ] **Images** — upload, variants, and delivery
+- [x] **Images** — upload, remote ingestion, browser-direct uploads, management,
+  downloads, and delivery URLs (including signed/private delivery)
 
 ## Usage
 
@@ -63,6 +65,38 @@ Early and incremental. Features land one at a time:
                     :headers {"Range" "bytes=0-1023"}})
 ```
 
+### Images
+
+```clojure
+(require '[com.heavycomputation.cloudflare.images :as images]
+         '[clojure.java.io :as io])
+
+(def images-client
+  (images/client {:account-id   "abc123"
+                  :api-token    "..."
+                  :account-hash "..."})) ; needed only for delivery-url
+
+;; Upload a File, byte[], or InputStream. Persist :id in your application.
+(def image (images/upload images-client (io/file "avatar.jpg")
+                          {:metadata {:user-id 42}}))
+(:id image) ; => "2cdc28f0-017a-49c4-9ed7-87056c83901"
+
+;; Cloudflare can also fetch a remote image without proxying it through you.
+(images/upload-url images-client "https://example.com/avatar.jpg")
+
+;; Or let a browser upload directly without exposing your API token.
+(images/direct-upload-url images-client)
+;; => {:id "future-image-id" :upload-url "https://upload.imagedelivery.net/..."}
+
+(images/get images-client (:id image))
+(images/delivery-url images-client (:id image) "public")
+(images/delete images-client (:id image))
+```
+
+The Images namespace also provides `list`, `list-seq`, `update`, `exists?`,
+`get-bytes`, `get-stream`, `stats`, `signing-keys`, and a raw `request` escape
+hatch. Uploads are limited by Cloudflare Images' current hosted-image limits.
+
 ## Installation
 
 deps.edn:
@@ -76,6 +110,7 @@ com.heavycomputation/cloudflare {:mvn/version "0.1.2"}
 ```bash
 clojure -M:dev        # REPL
 clojure -X:test       # run tests
+clojure -X:integration # live R2 + Images tests (requires credentials)
 clojure -T:build jar  # build a jar
 ```
 

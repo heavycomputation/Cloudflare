@@ -1,8 +1,8 @@
 {:paths ["src" "resources"]
 
- ;; Zero runtime dependencies beyond Clojure itself: R2 is reached by signing
- ;; requests with AWS Signature V4 (com.heavycomputation.cloudflare.internal.*)
- ;; and sending them over the JDK's built-in java.net.http client.
+ ;; Zero runtime dependencies beyond Clojure itself: R2 is reached with AWS
+ ;; Signature V4 and Images through Cloudflare's REST v4 API. Both transports
+ ;; use the JDK's built-in java.net.http client.
  :deps
  {org.clojure/clojure {:mvn/version "1.12.0"}}
 
@@ -15,7 +15,7 @@
    :main-opts   ["-m" "cognitect.test-runner"]
    :exec-fn     cognitect.test-runner.api/test}
 
-  ;; Live R2 round-trip against a real bucket (needs CLOUDFLARE_* env vars):
+  ;; Live R2 and Images round-trips (needs CLOUDFLARE_* env vars):
   ;;   clojure -X:integration
   ;; Kept separate from :test so CI stays offline.
   :integration

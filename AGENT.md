@@ -150,7 +150,8 @@ part retries on its own instead of the whole file.
 
 ## Feature 2 — Images upload / manage / serve
 
-> **Shipped (zero-dependency).** Reconciled to the implementation.
+> **Implemented (zero-dependency), pending the 0.1.3 release.** Reconciled to
+> the implementation and verified with both unit and live integration tests.
 
 ### Goal
 
