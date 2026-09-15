@@ -47,14 +47,13 @@ Verify changes with `clojure -X:test`.
 - [x] R2: browser-direct multipart (`create-multipart-upload`,
   `presigned-upload-part`, `complete-multipart-upload`, `abort-multipart-upload`)
 - [x] **R2 feature-complete — published** to Clojars as
-  `com.heavycomputation/cloudflare` (latest `0.1.2`)
+  `com.heavycomputation/cloudflare` (latest `0.1.3`)
 - [x] **Images: upload/manage/serve** — `upload` (File/byte[]/InputStream),
   `upload-url` (remote ingest), `direct-upload-url` (browser-direct), `get`,
   `list`/`list-seq`, `update`, `delete`, `exists?`, `get-bytes`/`get-stream`,
   `stats`, `signing-keys`, and `delivery-url` (named + flexible variants, with
   optional HMAC signing for private images). Zero-dependency REST v4 transport
-  (`internal.api`) + minimal JSON (`internal.json`). *Unreleased — on `master`
-  for the `0.1.3` cycle.*
+  (`internal.api`) + minimal JSON (`internal.json`). Published in `0.1.3`.
 
 ---
 
@@ -150,8 +149,8 @@ part retries on its own instead of the whole file.
 
 ## Feature 2 — Images upload / manage / serve
 
-> **Implemented (zero-dependency), pending the 0.1.3 release.** Reconciled to
-> the implementation and verified with both unit and live integration tests.
+> **Shipped in 0.1.3 (zero-dependency).** Reconciled to the implementation and
+> verified with both unit and live integration tests.
 
 ### Goal
 

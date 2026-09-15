@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.1.3] - 2026-09-16
 
 ### Added
 - Cloudflare Images client with local uploads (`File`, `byte[]`, or
