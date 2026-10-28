@@ -595,6 +595,8 @@
 ;;   ;; browser PUTs each part, reads the ETag from the response, reports back:
 ;;   (r2/complete-multipart-upload bucket "archives/pack.zip" (:upload-id up)
 ;;                                 [{:part-number 1 :etag "\"…\""} …])
+;;   ;; to resume after an interruption, see which parts R2 already has:
+;;   (r2/list-parts bucket "archives/pack.zip" (:upload-id up))
 ;;   ;; or, if the user cancels:
 ;;   (r2/abort-multipart-upload bucket "archives/pack.zip" (:upload-id up))
 ;; ---------------------------------------------------------------------------
@@ -643,6 +645,32 @@
     {:key    key
      :bucket bucket
      :etag   (complete-multipart client bucket key upload-id ordered)}))
+
+(defn- parse-part [block]
+  {:part-number   (some-> (xml/tag-text block "PartNumber") Long/parseLong)
+   :etag          (xml/tag-text block "ETag")
+   :size          (some-> (xml/tag-text block "Size") Long/parseLong)
+   :last-modified (parse-instant #(Instant/parse %) (xml/tag-text block "LastModified"))})
+
+(defn list-parts
+  "Parts already uploaded for multipart upload `upload-id`, as
+  `[{:part-number :etag :size :last-modified} …]` sorted by part number, or `nil`
+  if the upload doesn't exist (never started, completed, or aborted). Use it to
+  resume an interrupted browser upload: re-presign only the missing parts, then
+  pass the result (plus the new parts) to `complete-multipart-upload`. Follows
+  R2's pagination, so it returns every part (up to 10,000)."
+  [{:keys [client bucket]} key upload-id]
+  (loop [marker nil, acc []]
+    (when-let [resp (get-response s3/send-request client :ListParts
+                                  {:method "GET" :path (object-path bucket key)
+                                   :query  (cond-> {"uploadId" upload-id}
+                                             marker (assoc "part-number-marker" marker))})]
+      (let [xml   (body-string resp)
+            parts (into acc (map parse-part) (xml/tag-blocks xml "Part"))
+            next  (xml/tag-text xml "NextPartNumberMarker")]
+        (if (and (= "true" (xml/tag-text xml "IsTruncated")) next)
+          (recur next parts)
+          (vec (sort-by :part-number parts)))))))
 
 (defn abort-multipart-upload
   "Discard the in-progress multipart upload `upload-id` and any parts already

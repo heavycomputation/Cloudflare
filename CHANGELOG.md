@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.4] - 2026-10-28
+
+### Added
+- R2: `list-parts` returns the parts already uploaded for a multipart upload
+  (following pagination), or `nil` if the upload no longer exists — lets a
+  server resume an interrupted browser-direct upload.
+
+### Fixed
+- XML tag matching no longer treats a longer tag as a match for a shorter one
+  (e.g. `Part` matching `<PartNumber>`).
+
 ## [0.1.3] - 2026-09-16
 
 ### Added

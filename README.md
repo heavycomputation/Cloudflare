@@ -102,7 +102,7 @@ hatch. Uploads are limited by Cloudflare Images' current hosted-image limits.
 deps.edn:
 
 ```clojure
-com.heavycomputation/cloudflare {:mvn/version "0.1.3"}
+com.heavycomputation/cloudflare {:mvn/version "0.1.4"}
 ```
 
 ## Development

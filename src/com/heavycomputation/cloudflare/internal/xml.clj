@@ -21,11 +21,17 @@
       (str/replace "<" "&lt;")
       (str/replace ">" "&gt;")))
 
+(defn- tag-pattern
+  "Matches `<tag …>…</tag>`. Attributes must follow whitespace so `Part` doesn't
+  also match `<PartNumber>`."
+  [tag]
+  (re-pattern (str "(?s)<" tag "(?:\\s[^>]*)?>(.*?)</" tag ">")))
+
 (defn tag-text
   "Text content of the first `<tag>…</tag>` in `xml`, unescaped, or nil if the
   tag is absent."
   [xml tag]
-  (some-> (re-find (re-pattern (str "(?s)<" tag "[^>]*>(.*?)</" tag ">")) xml)
+  (some-> (re-find (tag-pattern tag) xml)
           second
           str/trim
           unescape))
@@ -35,7 +41,7 @@
   scope a nested parse — e.g. pull `<Key>` out of each `<Contents>` block in a
   listing — when the same child tag appears under several parents."
   [xml tag]
-  (map second (re-seq (re-pattern (str "(?s)<" tag "[^>]*>(.*?)</" tag ">")) xml)))
+  (map second (re-seq (tag-pattern tag) xml)))
 
 (defn complete-multipart-upload
   "Render a CompleteMultipartUpload request body from `parts`, a sequence of
